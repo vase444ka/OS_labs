@@ -37,9 +37,9 @@ static auto _getFunctionResult(HANDLE pipe) -> std::optional<std::string> {
 
     std::cout << "Receiving data from pipe..." << std::endl;
 
-    // This call blocks until a client process reads all the data
+    // This call blocks until a client process sends all the data
 
-    char *buffer = new char[sizeof(int)];
+    char *buffer = new char[sizeof(int) + 1];
     DWORD numBytesRead = 0;
     result = ReadFile(
             pipe,
@@ -50,15 +50,17 @@ static auto _getFunctionResult(HANDLE pipe) -> std::optional<std::string> {
     );
 
     if (result) {
-            std::cout << "Number of bytes read: " << numBytesRead <<std::endl;
-            buffer[4] = '\0';
-            std::cout << "Value read "<< buffer << std::endl;
+        std::cout << "Number of bytes read: " << numBytesRead <<std::endl;
+        buffer[sizeof(int)] = '\0';
+        std::string res(buffer);//type cast
+        delete [] buffer;
+        std::cout << "Value read "<< res << std::endl;
 
-            return std::string(buffer);
+
+        return res;
     }
 
     std::cout << "Failed to read data." << std::endl;
-    // look up error code here using GetLastError()
     return std::nullopt;
 
 }
@@ -126,8 +128,7 @@ Manager::RunExitCode Manager::run() {
 
 
         if (ready_future_it != func_futures.end()) {
-            if ((*ready_future_it).get())
-                func_results[std::distance(func_futures.begin(), ready_future_it)] = (*ready_future_it).get().value();
+            func_results[std::distance(func_futures.begin(), ready_future_it)] = (*ready_future_it).get().value();
             std::cout << "\n------------------------\nres_no: "
                       << std::distance(func_futures.begin(), ready_future_it) << std::endl;
             func_futures.erase(ready_future_it);
