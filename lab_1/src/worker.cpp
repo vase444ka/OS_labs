@@ -35,7 +35,7 @@ public:
             return 1;
         }
 
-        auto func_res = 1000000001;
+        auto func_res = spos::lab1::demo::f_func <spos::lab1::demo::OR> (2);
 
         char* tmp_buffer = (char*)&func_res;//cast func result into char*
         char* buffer = new char[sizeof(func_res)];

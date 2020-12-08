@@ -105,12 +105,12 @@ Manager::RunExitCode Manager::run() {
 
     std::vector<std::future<std::optional<std::string>>> func_futures;
     func_futures.emplace_back(std::async(std::launch::async, _getFunctionResult, _f_func_pipe));
-    //func_futures.emplace_back(std::async(std::launch::async, _getFunctionResult, _g_func_pipe));
+    func_futures.emplace_back(std::async(std::launch::async, _getFunctionResult, _g_func_pipe));
 
 
     //setting up workers for f and g
     _f_process_info = _runWorker(" " + _op_name + " f " + std::to_string(_x_arg) + " " + R"(\\.\pipe\f_func_pipe)");
-    //_g_process_info = _runWorker(" " + _op_name + " g " + std::to_string(_x_arg) + " " + R"(\\.\pipe\g_func_pipe)");
+    _g_process_info = _runWorker(" " + _op_name + " g " + std::to_string(_x_arg) + " " + R"(\\.\pipe\g_func_pipe)");
 
     if (!_f_process_info.has_value() /*|| !_g_process_info.has_value()*/) {
         CloseHandle(_f_func_pipe);
