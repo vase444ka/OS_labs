@@ -13,13 +13,14 @@
 #include <algorithm>
 #include <future>
 #include <iostream>
+#include <any>
 
 namespace spos::lab1 {
 
     class Manager {
     public:
         enum RunExitCode {
-            SUCCESS, WSA_STARTUP_FAILED, SOCKET_CONNECTION_ERROR, PROCESS_CREATION_FAILED
+            PIPE_PROCESS_CREATION_FAILED, PIPE_CONNECTION_FAILED, SUCCESS, PROCESS_CREATION_FAILED
         };
 
         Manager(std::string op_name, int x_arg);
@@ -33,6 +34,7 @@ namespace spos::lab1 {
         std::string _op_name;
         std::optional<PROCESS_INFORMATION> _f_process_info;
         std::optional<PROCESS_INFORMATION> _g_process_info;
+        HANDLE _f_func_pipe, _g_func_pipe;
     };
 
 } //namespace spos::lab1
