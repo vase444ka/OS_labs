@@ -7,71 +7,68 @@
 #include <any>
 
 namespace spos::lab1::utils {
-    std::any f_OR(std::any x) {
-        return x;
+
+class Worker {
+    char* _x;
+
+public:
+    explicit Worker(char* x)
+            : _x(x) {
     }
 
-    std::any g_OR(std::any x) {
-        return x;
+    int runWorker(char *pipe_name, char *func_id, char *op_name) {
+        std::cout << "(Worker) Connecting to the pipe..." << std::endl;
+
+        // Open the named pipe
+        HANDLE pipe = CreateFile(
+                pipe_name,
+                GENERIC_WRITE,
+                FILE_SHARE_WRITE,
+                nullptr,
+                CREATE_NEW,
+                FILE_ATTRIBUTE_NORMAL,
+                nullptr
+        );
+
+        if (pipe == INVALID_HANDLE_VALUE) {
+            std::cout << "(Worker) Failed to connect to pipe" << std::endl;
+            return 1;
+        }
+
+        auto func_res = 1000000001;
+
+        char* tmp_buffer = (char*)&func_res;//cast func result into char*
+        char* buffer = new char[sizeof(func_res)];
+        for (int i = 0; i<sizeof(func_res); i++){
+            buffer[i] = tmp_buffer[i];
+        }
+
+        std::cout << "(Worker) Writing data to pipe..." << std::endl;
+
+        DWORD numBytesWritten = 0;
+        BOOL isWritten = WriteFile(
+                pipe,
+                buffer,
+                sizeof(func_res),
+                &numBytesWritten,
+                nullptr
+        );
+
+        if (isWritten) {
+            std::cout << "(Worker) Value was written: " << buffer << "**"<<numBytesWritten<<std::endl;
+        } else {
+            std::cout << "(Worker) Failed to write the data to a pipe." << std::endl;
+        }
+
+        CloseHandle(pipe);
+        delete[] buffer;
+        std::cout << "(Worker) Done" << std::endl;
+
+        return 0;
     }
 
-    class Worker {
-        std::any _x;
-        std::map<char*, std::map<char*, std::function<std::any(std::any)>>> func_op;
-
-    public:
-        explicit Worker(std::any x)
-        : _x(x){
-            func_op["f"]["OR"] = std::bind(f_OR, _x);
-            func_op["g"]["OR"] = std::bind(g_OR, _x);
-        }
-
-        int _runFunction(char *pipe_name, char *func_id, char *op_name) {
-            std::cout << "(Worker) Connecting to the pipe..." << std::endl;
-
-            // Open the named pipe
-            HANDLE pipe = CreateFile(
-                    pipe_name,
-                    GENERIC_WRITE,
-                    FILE_SHARE_READ | FILE_SHARE_WRITE,
-                    nullptr,
-                    CREATE_NEW,
-                    FILE_ATTRIBUTE_NORMAL,
-                    nullptr
-            );
-
-            if (pipe == INVALID_HANDLE_VALUE) {
-                std::cout << "(Worker) Failed to connect to pipe" << std::endl;
-                return 1;
-            }
-
-            std::cout << "(Worker) Writing data to pipe..." << std::endl;
-
-            std::any buffer = func_op[func_id][op_name];
-
-            DWORD numBytesWritten = 0;
-            BOOL result = WriteFile(
-                    pipe,
-                    &buffer,
-                    sizeof(std::any),
-                    &numBytesWritten,
-                    nullptr
-            );
-
-            if (result) {
-                std::cout << "(Worker) Value was written: " << std::any_cast<char*>(buffer) << std::endl;
-            } else {
-                std::cout << "(Worker) Failed to write the data to a pipe." << std::endl;
-            }
-
-            CloseHandle(pipe);
-            std::cout << "(Worker) Done" << std::endl;
-
-            return 0;
-        }
-
-    };
-} //namespace spos::lab1::utils
+};
+}//namespace spos::lab1::utils
 
 /*
 argv:
@@ -84,5 +81,5 @@ argv:
 int main(int argc, char *argv[]) {
     spos::lab1::utils::Worker worker = spos::lab1::utils::Worker(argv[3]);
 
-    return worker._runFunction(argv[4], argv[2], argv[1]);
+    return worker.runWorker(argv[4], argv[2], argv[1]);
 }
