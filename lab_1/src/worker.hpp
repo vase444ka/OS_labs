@@ -8,7 +8,6 @@
 #include "demofuncs.hpp"
 #include <iostream>
 #include <windows.h>
-#include <functional>
 
 namespace spos::lab1::utils {
 class Worker {
@@ -21,9 +20,7 @@ public:
     static int sendResult(char *pipe_name, char* buffer, unsigned int numOfBytes);
 };
 
-static char* dummyCStrCast(auto arg);
-
-static int dummyIntCast(char* arg);
+char* dummyCStrCast(bool arg);
 }//namespace spos::lab1::utils
 
 

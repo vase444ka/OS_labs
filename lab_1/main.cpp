@@ -5,7 +5,7 @@ int main() {
 
     freopen("output.txt", "w", stdout);
 
-    spos::lab1::Manager test("OR", 2);
+    spos::lab1::Manager test("OR", 1);
     test.run();
 
     return 0;

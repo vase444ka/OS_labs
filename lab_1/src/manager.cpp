@@ -23,7 +23,7 @@ std::optional<PROCESS_INFORMATION> Manager::_runWorker(const std::string &comman
     return process_info;
 }
 
-static auto _getFunctionResult(HANDLE pipe) -> std::optional<std::string> {
+static auto _getFunctionResult(HANDLE pipe) -> std::optional<bool> {
 
     std::cout << "Waiting for a client to connect to the pipe..." << std::endl;
 
@@ -109,8 +109,8 @@ Manager::RunExitCode Manager::run() {
 
 
     //setting up workers for f and g
-    _f_process_info = _runWorker(" " + _op_name + " f " + std::to_string(_x_arg) + " " + R"(\\.\pipe\f_func_pipe)");
-    _g_process_info = _runWorker(" " + _op_name + " g " + std::to_string(_x_arg) + " " + R"(\\.\pipe\g_func_pipe)");
+    _f_process_info = _runWorker("  f " + std::to_string(_x_arg) + " " + R"(\\.\pipe\f_func_pipe)");
+    _g_process_info = _runWorker("  g " + std::to_string(_x_arg) + " " + R"(\\.\pipe\g_func_pipe)");
 
     if (!_f_process_info.has_value() /*|| !_g_process_info.has_value()*/) {
         CloseHandle(_f_func_pipe);

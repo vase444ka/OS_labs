@@ -5,18 +5,13 @@
 #include "worker.hpp"
 
 namespace spos::lab1::utils{
-char* dummyCStrCast(auto b) {
+char* dummyCStrCast(bool b) {
     char *tmp_buffer = (char *) &b;//cast func result into char*
     char *buffer = new char[sizeof(b)];
     for (int i = 0; i < sizeof(b); i++) {
         buffer[i] = tmp_buffer[i];
-        return buffer;
     }
-}
-
-int dummyIntCast(char *arg) {
-    int* tmp_p = (int*)(arg);
-    return *tmp_p;
+    return buffer;
 }
 
 bool Worker::getFunctionResult(int x) {
@@ -67,6 +62,7 @@ int Worker::sendResult(char* pipe_name, char* buffer, unsigned int numOfBytes) {
     CloseHandle(pipe);
     std::cout << "(Worker) Done" << std::endl;
 
-    return 0;}
+    return 0;
+}
 
 }
