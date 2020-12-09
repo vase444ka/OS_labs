@@ -1,85 +1,72 @@
-#include "demofuncs.hpp"
+//
+// Created by vbory on 12/9/2020.
+//
 
-#include <iostream>
-#include <windows.h>
-#include <map>
-#include <functional>
-#include <any>
+#include "worker.hpp"
 
-namespace spos::lab1::utils {
+namespace spos::lab1::utils{
+char* dummyCStrCast(auto b) {
+    char *tmp_buffer = (char *) &b;//cast func result into char*
+    char *buffer = new char[sizeof(b)];
+    for (int i = 0; i < sizeof(b); i++) {
+        buffer[i] = tmp_buffer[i];
+        return buffer;
+    }
+}
 
-class Worker {
-    char* _x;
+int dummyIntCast(char *arg) {
+    int* tmp_p = (int*)(arg);
+    return *tmp_p;
+}
 
-public:
-    explicit Worker(char* x)
-            : _x(x) {
+bool Worker::getFunctionResult(int x) {
+    if (_func_id[0] == 'f')
+        return demo::f_func<demo::OR>(x);
+    else if (_func_id[0] == 'g')
+        return demo::g_func<demo::OR>(x);
+    else
+        throw std::invalid_argument("Invalid function id in worker");
+}
+
+int Worker::sendResult(char* pipe_name, char* buffer, unsigned int numOfBytes) {
+    std::cout << "(Worker) Connecting to the pipe..." << std::endl;
+
+    // Open the named pipe
+    HANDLE pipe = CreateFile(
+            pipe_name,
+            GENERIC_WRITE,
+            FILE_SHARE_WRITE,
+            nullptr,
+            CREATE_NEW,
+            FILE_ATTRIBUTE_NORMAL,
+            nullptr
+    );
+
+    if (pipe == INVALID_HANDLE_VALUE) {
+        std::cout << "(Worker) Failed to connect to pipe" << std::endl;
+        return 1;
     }
 
-    int runWorker(char *pipe_name, char *func_id, char *op_name) {
-        std::cout << "(Worker) Connecting to the pipe..." << std::endl;
+    std::cout << "(Worker) Writing data to pipe..." << std::endl;
 
-        // Open the named pipe
-        HANDLE pipe = CreateFile(
-                pipe_name,
-                GENERIC_WRITE,
-                FILE_SHARE_WRITE,
-                nullptr,
-                CREATE_NEW,
-                FILE_ATTRIBUTE_NORMAL,
-                nullptr
-        );
+    DWORD numBytesWritten = 0;
+    BOOL isWritten = WriteFile(
+            pipe,
+            buffer,
+            numOfBytes,
+            &numBytesWritten,
+            nullptr
+    );
 
-        if (pipe == INVALID_HANDLE_VALUE) {
-            std::cout << "(Worker) Failed to connect to pipe" << std::endl;
-            return 1;
-        }
-
-        auto func_res = spos::lab1::demo::f_func <spos::lab1::demo::OR> (2);
-
-        char* tmp_buffer = (char*)&func_res;//cast func result into char*
-        char* buffer = new char[sizeof(func_res)];
-        for (int i = 0; i<sizeof(func_res); i++){
-            buffer[i] = tmp_buffer[i];
-        }
-
-        std::cout << "(Worker) Writing data to pipe..." << std::endl;
-
-        DWORD numBytesWritten = 0;
-        BOOL isWritten = WriteFile(
-                pipe,
-                buffer,
-                sizeof(func_res),
-                &numBytesWritten,
-                nullptr
-        );
-
-        if (isWritten) {
-            std::cout << "(Worker) Value was written: " << buffer << "**"<<numBytesWritten<<std::endl;
-        } else {
-            std::cout << "(Worker) Failed to write the data to a pipe." << std::endl;
-        }
-
-        CloseHandle(pipe);
-        delete[] buffer;
-        std::cout << "(Worker) Done" << std::endl;
-
-        return 0;
+    if (isWritten) {
+        std::cout << "(Worker) Value was written: " << buffer << "**" << numBytesWritten << std::endl;
+    } else {
+        std::cout << "(Worker) Failed to write the data to a pipe." << std::endl;
     }
 
-};
-}//namespace spos::lab1::utils
+    CloseHandle(pipe);
+    std::cout << "(Worker) Done" << std::endl;
 
-/*
-argv:
-    [1] operation_name,
-    [2] function_id,
-    [3] x_argument,
-    [4] pipe_name
-*/
+    return 0;}
 
-int main(int argc, char *argv[]) {
-    spos::lab1::utils::Worker worker = spos::lab1::utils::Worker(argv[3]);
-
-    return worker.runWorker(argv[4], argv[2], argv[1]);
 }

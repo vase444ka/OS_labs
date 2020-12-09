@@ -5,4 +5,4 @@ set(CMAKE_CXX_STANDARD 20)
 
 add_executable(lab_1 main.cpp src/manager.cpp)
 
-add_executable(f_g_funcs src/worker.cpp)
+add_executable(f_g_funcs src/worker_executable.cpp src/worker.cpp src/worker.hpp)
