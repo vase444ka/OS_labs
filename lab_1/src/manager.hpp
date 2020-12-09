@@ -25,12 +25,14 @@ namespace spos::lab1 {
 
         Manager(std::string op_name, int x_arg);
         RunExitCode run();
+        std::optional <bool> getResult(){return _res;}
 
     private:
         static auto _runWorker(const std::string &command_line) -> std::optional<PROCESS_INFORMATION>;
-        //_getFunctionResult implementation
+        static auto _getFunctionResult(HANDLE pipe) -> std::optional<bool>;
 
         int _x_arg;
+        std::optional<bool> _res;
         std::string _op_name;
         std::optional<PROCESS_INFORMATION> _f_process_info;
         std::optional<PROCESS_INFORMATION> _g_process_info;

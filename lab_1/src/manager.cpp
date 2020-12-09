@@ -23,7 +23,7 @@ std::optional<PROCESS_INFORMATION> Manager::_runWorker(const std::string &comman
     return process_info;
 }
 
-static auto _getFunctionResult(HANDLE pipe) -> std::optional<bool> {
+auto Manager::_getFunctionResult(HANDLE pipe) -> std::optional<bool> {
 
     std::cout << "Waiting for a client to connect to the pipe..." << std::endl;
 
@@ -39,23 +39,21 @@ static auto _getFunctionResult(HANDLE pipe) -> std::optional<bool> {
 
     // This call blocks until a client process sends all the data
 
-    char *buffer = new char[sizeof(int) + 1];
+    char *buffer = new char[sizeof(bool)];
     DWORD numBytesRead = 0;
     result = ReadFile(
             pipe,
             buffer, // the data from the pipe will be put here
-            sizeof(int), // number of bytes allocated
+            sizeof(bool), // number of bytes allocated
             &numBytesRead, // this will store number of bytes actually read
             0 // not using overlapped IO
     );
 
     if (result) {
         std::cout << "Number of bytes read: " << numBytesRead <<std::endl;
-        buffer[sizeof(int)] = '\0';
-        std::string res(buffer);//type cast
+        bool res = (bool)(*buffer);
         delete [] buffer;
         std::cout << "Value read "<< res << std::endl;
-
 
         return res;
     }
@@ -103,7 +101,7 @@ Manager::RunExitCode Manager::run() {
         return PIPE_PROCESS_CREATION_FAILED;
     }
 
-    std::vector<std::future<std::optional<std::string>>> func_futures;
+    std::vector<std::future<std::optional<bool>>> func_futures;
     func_futures.emplace_back(std::async(std::launch::async, _getFunctionResult, _f_func_pipe));
     func_futures.emplace_back(std::async(std::launch::async, _getFunctionResult, _g_func_pipe));
 
@@ -112,15 +110,14 @@ Manager::RunExitCode Manager::run() {
     _f_process_info = _runWorker("  f " + std::to_string(_x_arg) + " " + R"(\\.\pipe\f_func_pipe)");
     _g_process_info = _runWorker("  g " + std::to_string(_x_arg) + " " + R"(\\.\pipe\g_func_pipe)");
 
-    if (!_f_process_info.has_value() /*|| !_g_process_info.has_value()*/) {
+    if (!_f_process_info.has_value() || !_g_process_info.has_value()) {
         CloseHandle(_f_func_pipe);
         CloseHandle(_g_func_pipe);
         return PROCESS_CREATION_FAILED;
     }
 
-    std::vector<std::optional<std::string>> func_results(func_futures.size(), std::nullopt);
+    std::vector<std::optional<bool>> func_results(func_futures.size(), std::nullopt);
     while (!func_futures.empty()) {
-        //std::cout<<"shit"<<std::endl;
         const auto ready_future_it = std::find_if(
                 func_futures.begin(),
                 func_futures.end(),
@@ -128,12 +125,26 @@ Manager::RunExitCode Manager::run() {
 
 
         if (ready_future_it != func_futures.end()) {
-            func_results[std::distance(func_futures.begin(), ready_future_it)] = (*ready_future_it).get().value();
-            std::cout << "\n------------------------\nres_no: "
-                      << std::distance(func_futures.begin(), ready_future_it) << std::endl;
+            std::optional <bool> ready_future = (*ready_future_it).get();
+            if (!ready_future)
+                return PIPE_CONNECTION_FAILED;
+
+            int res_no = std::distance(func_futures.begin(), ready_future_it);
+            func_results[res_no] = ready_future.value();
+            std::cout << "\n------------------------\nres_no: "<< res_no <<" = "<<ready_future.value()<< std::endl;
             func_futures.erase(ready_future_it);
+
+            if (func_results[res_no] == true){
+                _res = true;
+                // Close the pipe (automatically disconnects client too)
+                CloseHandle(_f_func_pipe);
+                CloseHandle(_g_func_pipe);
+
+                return SUCCESS;
+            }
         }
     }
+    _res = (func_results[0].value() || func_results[1].value());
 
     // Close the pipe (automatically disconnects client too)
     CloseHandle(_f_func_pipe);

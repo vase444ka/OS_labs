@@ -15,6 +15,7 @@ char* dummyCStrCast(bool b) {
 }
 
 bool Worker::getFunctionResult(int x) {
+    std::cout<<"Computing func result..."<<std::endl;
     if (_func_id[0] == 'f')
         return demo::f_func<demo::OR>(x);
     else if (_func_id[0] == 'g')
@@ -54,7 +55,7 @@ int Worker::sendResult(char* pipe_name, char* buffer, unsigned int numOfBytes) {
     );
 
     if (isWritten) {
-        std::cout << "(Worker) Value was written: " << buffer << "**" << numBytesWritten << std::endl;
+        std::cout << "(Worker) Value was written: " << bool(buffer[0]) << "**" << numBytesWritten << std::endl;
     } else {
         std::cout << "(Worker) Failed to write the data to a pipe." << std::endl;
     }
