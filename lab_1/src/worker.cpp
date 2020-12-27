@@ -25,7 +25,7 @@ bool Worker::getFunctionResult(int x) {
 }
 
 int Worker::connectPipe(char *pipe_name) {
-    std::cout << "(Worker) Connecting to the pipe..." << std::endl;
+    std::cout << "(Worker) Connecting to the _pipe..." << std::endl;
 
     // Open the named _pipe
     _pipe = CreateFile(
@@ -39,7 +39,7 @@ int Worker::connectPipe(char *pipe_name) {
     );
 
     if (_pipe == INVALID_HANDLE_VALUE) {
-        std::cout << "(Worker) Failed to connect to pipe" << std::endl;
+        std::cout << "(Worker) Failed to connect to _pipe" << std::endl;
         return 1;
     }
     return 0;

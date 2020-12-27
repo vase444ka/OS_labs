@@ -5,7 +5,7 @@ int main() {
 
     freopen("output.txt", "w", stdout);
 
-    spos::lab1::ManagerBase test(2);
+    spos::lab1::ManagerBase test(1);
     test.run();
 
     std::optional <bool> res = test.getResult();

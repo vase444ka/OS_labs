@@ -26,16 +26,16 @@ std::optional<PROCESS_INFORMATION> ManagerBase::_runWorker(const std::string &co
 }
 
 auto ManagerBase::_getResult(HANDLE pipe) -> std::optional<bool> {
-    std::cout << "Waiting for a client to connect to the pipe... Thread no" << std::this_thread::get_id()<< std::endl;
+    std::cout << "Waiting for a client to connect to the _pipe... Thread no" << std::this_thread::get_id()<< std::endl;
     BOOL result = ConnectNamedPipe(pipe, nullptr);
 
     if (!result){
-        std::cout << "Failed to connect pipe." << std::endl;
+        std::cout << "Failed to connect _pipe." << std::endl;
         CloseHandle(pipe);
         return std::nullopt;
     }
 
-    std::cout << "Receiving data from pipe..." << std::endl;
+    std::cout << "Receiving data from _pipe..." << std::endl;
     char *buffer = new char[sizeof(bool)];
     DWORD numBytesRead = 0;
     result = ReadFile(
@@ -59,74 +59,63 @@ auto ManagerBase::_getResult(HANDLE pipe) -> std::optional<bool> {
     return std::nullopt;
 }
 
-ManagerBase::RunExitCode ManagerBase::run() {
-    std::vector<std::future<std::optional<bool>>> func_futures;
-    std::vector<PROCESS_INFORMATION> process_info;
-    std::vector<HANDLE> pipe;
+bool ManagerBase::_setup(std::string func_name) {
+    std::cout << "Creating an instance of a named _pipe..." << std::endl;
+    std::string pipe_name = R"(\\.\pipe\func_pipe_)";
+    pipe_name += func_name;
 
-    for (int i = 0; i < 2; i++) {
-        std::cout << "Creating an instance of a named pipe..." << std::endl;
-        std::string func_name = i == 0 ? "f" : "g";
-        std::string pipe_name = R"(\\.\pipe\func_pipe_)";
-        pipe_name += func_name;
+    _pipe.emplace_back(CreateNamedPipeA(
+            pipe_name.c_str(), // name of the _pipe
+            PIPE_ACCESS_INBOUND, // 1-way _pipe -- receive only
+            PIPE_TYPE_BYTE, // send data as a byte stream
+            1, // only allow 1 instance of this _pipe
+            0, // no outbound buffer
+            0, // no inbound buffer
+            0, // use default wait time
+            nullptr // use default security attributes
+    ));
 
-        //_pipe creation and connection
-        pipe.emplace_back(CreateNamedPipeA(
-                pipe_name.c_str(), // name of the _pipe
-                PIPE_ACCESS_INBOUND, // 1-way _pipe -- receive only
-                PIPE_TYPE_BYTE, // send data as a byte stream
-                1, // only allow 1 instance of this _pipe
-                0, // no outbound buffer
-                0, // no inbound buffer
-                0, // use default wait time
-                nullptr // use default security attributes
-        ));
-
-        if (pipe[i] == nullptr || pipe[i] == INVALID_HANDLE_VALUE) {
-            std::cout << "Failed to create inbound pipe instance." << std::endl;
-            std::cout << GetLastError() << std::endl;
-            return PIPE_CREATION_FAILED;
-        }
-
-        //process creation
-        func_futures.emplace_back(std::async(std::launch::async, _getResult, pipe[i]));
-        auto tmp_process_info = _runWorker(" " + func_name + " " + std::to_string(_x_arg) + " " + pipe_name);
-        if (tmp_process_info.has_value()) {
-            process_info.push_back(tmp_process_info.value());
-        }
-        else {
-            for (auto &it : pipe)
-                CloseHandle(it);
-            return PROCESS_CREATION_FAILED;
-        }
+    if (_pipe.back() == nullptr || _pipe.back() == INVALID_HANDLE_VALUE) {
+        std::cout << "Failed to create inbound pipe instance." << std::endl;
+        return false;
     }
 
+    _func_futures.emplace_back(std::async(std::launch::async, _getResult, _pipe.back()));
+    auto tmp_process_info = _runWorker(" " + func_name + " " + std::to_string(_x_arg) + " " + pipe_name);
+    if (tmp_process_info.has_value()) {
+        _process_info.push_back(tmp_process_info.value());
+    }
+    else {
+        for (auto &it : _pipe)
+            CloseHandle(it);
+        return false;
+    }
+
+    return true;
+}
+
+ManagerBase::RunExitCode ManagerBase::run() {
+    if (!_setup("f") || !_setup("g")) {
+        return SETUP_FAILED;
+    }
 
     std::vector<bool> func_results;
-    while (!func_futures.empty()) {
+    while (!_func_futures.empty()) {
         const auto ready_future_it = std::find_if(
-                func_futures.begin(),
-                func_futures.end(),
+                _func_futures.begin(),
+                _func_futures.end(),
                 [](auto &fut) { return fut.wait_for(std::chrono::seconds(0)) == std::future_status::ready; });
 
 
-        if (ready_future_it != func_futures.end()) {
+        if (ready_future_it != _func_futures.end()) {
             std::optional <bool> ready_future = (*ready_future_it).get();
             if (!ready_future)
                 return PIPE_CONNECTION_FAILED;
 
-            int res_no = std::distance(func_futures.begin(), ready_future_it);
+            int res_no = std::distance(_func_futures.begin(), ready_future_it);
             func_results.push_back(ready_future.value());
             std::cout << "\n------------------------\nres_no: "<< res_no <<" = "<<ready_future.value()<< std::endl;
-            func_futures.erase(ready_future_it);
-
-            //debug
-            if (func_results[func_results.size() - 1]){
-                UINT exitcode;
-                TerminateProcess(process_info[1].hProcess, exitcode);
-                _res = 1;
-                return SHORT_CIRCUIT_EVALUATED;
-            }
+            _func_futures.erase(ready_future_it);
         }
     }
     if (func_results.size() == 2)
@@ -134,4 +123,6 @@ ManagerBase::RunExitCode ManagerBase::run() {
 
     return SUCCESS;
 }
+
+
 }//namespace spos::lab1
