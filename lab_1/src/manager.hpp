@@ -20,7 +20,7 @@ namespace spos::lab1 {
     class ManagerBase {
     public:
         enum RunExitCode {
-            PIPE_CREATION_FAILED, PIPE_CONNECTION_FAILED, SUCCESS, PROCESS_CREATION_FAILED
+            PIPE_CREATION_FAILED, PIPE_CONNECTION_FAILED, SUCCESS, PROCESS_CREATION_FAILED, SHORT_CIRCUIT_EVALUATED
         };
 
         explicit ManagerBase(int x_arg);

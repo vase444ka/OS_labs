@@ -24,11 +24,11 @@ bool Worker::getFunctionResult(int x) {
         throw std::invalid_argument("Invalid function id in worker");
 }
 
-int Worker::sendResult(char* pipe_name, char* buffer, unsigned int numOfBytes) {
+int Worker::connectPipe(char *pipe_name) {
     std::cout << "(Worker) Connecting to the pipe..." << std::endl;
 
-    // Open the named pipe
-    HANDLE pipe = CreateFile(
+    // Open the named _pipe
+    _pipe = CreateFile(
             pipe_name,
             GENERIC_WRITE,
             FILE_SHARE_WRITE,
@@ -38,16 +38,19 @@ int Worker::sendResult(char* pipe_name, char* buffer, unsigned int numOfBytes) {
             nullptr
     );
 
-    if (pipe == INVALID_HANDLE_VALUE) {
+    if (_pipe == INVALID_HANDLE_VALUE) {
         std::cout << "(Worker) Failed to connect to pipe" << std::endl;
         return 1;
     }
+    return 0;
+}
 
-    std::cout << "(Worker) Writing data to pipe..." << std::endl;
+int Worker::sendResult(char* buffer, unsigned int numOfBytes) {
+    std::cout << "(Worker) Writing data to _pipe..." << std::endl;
 
     DWORD numBytesWritten = 0;
     BOOL isWritten = WriteFile(
-            pipe,
+            _pipe,
             buffer,
             numOfBytes,
             &numBytesWritten,
@@ -57,13 +60,15 @@ int Worker::sendResult(char* pipe_name, char* buffer, unsigned int numOfBytes) {
    if (isWritten) {
         std::cout << "(Worker) Value written: " << bool(buffer[0]) << "___size(bytes):_____" << numBytesWritten << std::endl;
     } else {
-        std::cout << "(Worker) Failed to write the data to a pipe. "<<GetLastError()<< std::endl;
+        std::cout << "(Worker) Failed to write the data to a _pipe. "<<GetLastError()<< std::endl;
     }
 
-    CloseHandle(pipe);
+    CloseHandle(_pipe);
     std::cout << "(Worker) Done" << std::endl;
 
     return 0;
 }
+
+
 
 }

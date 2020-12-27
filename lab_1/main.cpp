@@ -5,16 +5,14 @@ int main() {
 
     freopen("output.txt", "w", stdout);
 
-    spos::lab1::ManagerBase test(0);
+    spos::lab1::ManagerBase test(2);
     test.run();
-
-    std::cout<<"____main after manager___"<<std::endl;
 
     std::optional <bool> res = test.getResult();
     if (res)
         std::cout<<test.getResult().value();
     else
-        std::cout<<"sdkjlkhfhkeiuhfiueygf"<<std::endl;
+        std::cout<<"__Result's not computed____"<<std::endl;
 
     return 0;
 }
