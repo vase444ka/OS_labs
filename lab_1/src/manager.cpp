@@ -1,11 +1,13 @@
 #include "manager.hpp"
 
+#include <thread>//debug
+
 namespace spos::lab1 {
 
-Manager::Manager(std::string op_name, int x_arg) :
-        _x_arg{x_arg}, _op_name{std::move(op_name)} {}
+ManagerBase::ManagerBase(int x_arg) :
+        _x_arg{x_arg} {}
 
-std::optional<PROCESS_INFORMATION> Manager::_runWorker(const std::string &command_line) {
+std::optional<PROCESS_INFORMATION> ManagerBase::_runWorker(const std::string &command_line) {
     STARTUPINFO startup_info;
     PROCESS_INFORMATION process_info;
 
@@ -23,22 +25,34 @@ std::optional<PROCESS_INFORMATION> Manager::_runWorker(const std::string &comman
     return process_info;
 }
 
-auto Manager::_getFunctionResult(HANDLE pipe) -> std::optional<bool> {
+auto ManagerBase::_getResult(HANDLE pipe) -> std::optional<bool> {
+    std::cout << "Waiting for a client to connect to the pipe... Thread no" << std::this_thread::get_id()<< std::endl;
 
-    std::cout << "Waiting for a client to connect to the pipe..." << std::endl;
+    //debug
+    LPOVERLAPPED lpOverlapped;
+    lpOverlapped->hEvent = CreateEvent(
+            NULL,               // default security attributes
+            TRUE,               // manual-reset event
+            TRUE,              // initial state is nonsignaled
+            NULL  // object name
+    );
 
-    // This call blocks until a client process connects to the pipe
-    BOOL result = ConnectNamedPipe(pipe, nullptr);
-    if (!result) {
+    std::cout<<"Connecting the pipe..."<<std::endl;
+    // This call blocks until a client process connects to the pipe TODO overlapping
+    BOOL result = ConnectNamedPipe(pipe, lpOverlapped);
+    if (!result && GetLastError() != ERROR_IO_PENDING && GetLastError() != ERROR_PIPE_CONNECTED) {
         std::cout << "Failed to make connection on named pipe." << std::endl;
-        // look up error code here using GetLastError()
+        CloseHandle(pipe);
         return std::nullopt;
+    }
+
+    if (!result && GetLastError() == ERROR_IO_PENDING){
+        WaitForSingleObject(lpOverlapped->hEvent, INFINITE);
     }
 
     std::cout << "Receiving data from pipe..." << std::endl;
 
     // This call blocks until a client process sends all the data
-
     char *buffer = new char[sizeof(bool)];
     DWORD numBytesRead = 0;
     result = ReadFile(
@@ -46,78 +60,82 @@ auto Manager::_getFunctionResult(HANDLE pipe) -> std::optional<bool> {
             buffer, // the data from the pipe will be put here
             sizeof(bool), // number of bytes allocated
             &numBytesRead, // this will store number of bytes actually read
-            0 // not using overlapped IO
+            nullptr // not using overlapped IO
     );
 
     if (result) {
-        std::cout << "Number of bytes read: " << numBytesRead <<std::endl;
         bool res = (bool)(*buffer);
         delete [] buffer;
-        std::cout << "Value read "<< res << std::endl;
+        std::cout << "Value read "<< res <<"_____size(bytes)________"<<numBytesRead<< std::endl;
 
+        CloseHandle(pipe);
         return res;
     }
 
     std::cout << "Failed to read data." << std::endl;
+    CloseHandle(pipe);
     return std::nullopt;
 
 }
 
-Manager::RunExitCode Manager::run() {
-    //creating pipes
-    std::cout << "Creating an instance of a named pipe..." << std::endl;
 
-    _f_func_pipe = CreateNamedPipe(
-            R"(\\.\pipe\f_func_pipe)", // name of the pipe
-            PIPE_ACCESS_INBOUND, // 1-way pipe -- receive only
-            PIPE_TYPE_BYTE, // send data as a byte stream
-            1, // only allow 1 instance of this pipe
-            0, // no outbound buffer
-            0, // no inbound buffer
-            0, // use default wait time
-            nullptr // use default security attributes
-    );
 
-    if (_f_func_pipe == nullptr || _f_func_pipe == INVALID_HANDLE_VALUE) {
-        std::cout << "Failed to create inbound pipe instance.";
-        // look up error code here using GetLastError()
-        return PIPE_PROCESS_CREATION_FAILED;
-    }
-
-    _g_func_pipe = CreateNamedPipe(
-            R"(\\.\pipe\g_func_pipe)", // name of the pipe
-            PIPE_ACCESS_INBOUND, // 1-way pipe -- receive only
-            PIPE_TYPE_BYTE, // send data as a byte stream
-            1, // only allow 1 instance of this pipe
-            0, // no outbound buffer
-            0, // no inbound buffer
-            0, // use default wait time
-            nullptr // use default security attributes
-    );
-
-    if (_g_func_pipe == nullptr || _g_func_pipe == INVALID_HANDLE_VALUE) {
-        std::cout << "Failed to create inbound pipe instance.";
-        // look up error code here using GetLastError()
-        return PIPE_PROCESS_CREATION_FAILED;
-    }
-
+ManagerBase::RunExitCode ManagerBase::run() {
     std::vector<std::future<std::optional<bool>>> func_futures;
-    func_futures.emplace_back(std::async(std::launch::async, _getFunctionResult, _f_func_pipe));
-    func_futures.emplace_back(std::async(std::launch::async, _getFunctionResult, _g_func_pipe));
+    std::vector<PROCESS_INFORMATION> process_info;
+    std::vector<HANDLE> pipe;
 
+    for (int i = 0; i < 2; i++) {
+        std::cout << "Creating an instance of a named pipe..." << std::endl;
+        std::string func_name = i == 0 ? "f" : "g";
+        std::string pipe_name = R"(\\.\pipe\func_pipe_)";
+        pipe_name += func_name;
 
-    //setting up workers for f and g
-    _f_process_info = _runWorker("  f " + std::to_string(_x_arg) + " " + R"(\\.\pipe\f_func_pipe)");
-    _g_process_info = _runWorker("  g " + std::to_string(_x_arg) + " " + R"(\\.\pipe\g_func_pipe)");
+        //pipe creation and connection
+        pipe.emplace_back(CreateNamedPipeA(
+                pipe_name.c_str(), // name of the pipe
+                PIPE_ACCESS_INBOUND | FILE_FLAG_OVERLAPPED, // 1-way pipe -- receive only
+                PIPE_TYPE_BYTE, // send data as a byte stream TODO decide whether we need overlapped flag
+                1, // only allow 1 instance of this pipe
+                0, // no outbound buffer
+                0, // no inbound buffer
+                0, // use default wait time
+                nullptr // use default security attributes
+        ));
 
-    if (!_f_process_info.has_value() || !_g_process_info.has_value()) {
-        CloseHandle(_f_func_pipe);
-        CloseHandle(_g_func_pipe);
-        return PROCESS_CREATION_FAILED;
+        if (pipe[i] == nullptr || pipe[i] == INVALID_HANDLE_VALUE) {
+            std::cout << "Failed to create inbound pipe instance." << std::endl;
+            std::cout << GetLastError() << std::endl;
+            return PIPE_CREATION_FAILED;
+        }
+
+        //process creation
+        func_futures.emplace_back(std::async(std::launch::async, _getResult, pipe[i]));
+        auto tmp_process_info = _runWorker(" " + func_name + " " + std::to_string(_x_arg) + " " + pipe_name);
+        if (tmp_process_info.has_value()) {
+            process_info.push_back(tmp_process_info.value());
+        }
+        else {
+            for (auto &it : pipe)
+                CloseHandle(it);
+            return PROCESS_CREATION_FAILED;
+        }
     }
 
-    std::vector<std::optional<bool>> func_results(func_futures.size(), std::nullopt);
+    //demo (func_futures needed + some process info)
+
+    std::vector<bool> func_results;
+    int tmp_clock = 0;
     while (!func_futures.empty()) {
+        tmp_clock++;//debug
+        if (tmp_clock % (int)1e3 == 0) std::cout<<tmp_clock<<std::endl;
+        if (tmp_clock > 1e6){//debug
+            UINT exit_code;
+            TerminateProcess(process_info[1].hProcess, exit_code);
+            std::cout<<"closing g pipe------------------1"<<std::endl;
+            break;//debug
+        }//debug
+
         const auto ready_future_it = std::find_if(
                 func_futures.begin(),
                 func_futures.end(),
@@ -130,26 +148,15 @@ Manager::RunExitCode Manager::run() {
                 return PIPE_CONNECTION_FAILED;
 
             int res_no = std::distance(func_futures.begin(), ready_future_it);
-            func_results[res_no] = ready_future.value();
+            func_results.push_back(ready_future.value());
             std::cout << "\n------------------------\nres_no: "<< res_no <<" = "<<ready_future.value()<< std::endl;
             func_futures.erase(ready_future_it);
-
-            if (func_results[res_no] == true){
-                _res = true;
-                // Close the pipe (automatically disconnects client too)
-                CloseHandle(_f_func_pipe);
-                CloseHandle(_g_func_pipe);
-
-                return SUCCESS;
-            }
         }
     }
-    _res = (func_results[0].value() || func_results[1].value());
+    if (func_results.size() == 2)
+        _res = (func_results[0] || func_results[1]);
 
-    // Close the pipe (automatically disconnects client too)
-    CloseHandle(_f_func_pipe);
-    CloseHandle(_g_func_pipe);
-
+    std::cout<<"----manager run returns----"<<std::endl;
     return SUCCESS;
 }
 }//namespace spos::lab1
