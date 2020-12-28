@@ -2,8 +2,12 @@
 #include "src/manager.hpp"
 
 int main() {
-    spos::lab1::Manager test(5);
+    int x;
+    std::cin>>x;
+
+    spos::lab1::Manager test(x);
     test.run();
     test.printResult();
+
     return 0;
 }

@@ -174,6 +174,8 @@ void Manager::printResult() {
             while(!_status[i] && i < 2) i++;
             if (i < 2)
                 std::cout<<"> function no."<<i<<" is computed. Function no."<<(i + 1) % 2<<" computation is cancelled"<<std::endl;
+            else
+                std::cout<<"> bot functions' computation is cancelled"<<std::endl;
             std::cout<<"> result is not defined"<<std::endl;
             break;
     }
