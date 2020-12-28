@@ -8,13 +8,16 @@
 #include "demofuncs.hpp"
 #include <iostream>
 #include <windows.h>
+#include <fstream>
 
 namespace spos::lab1::utils {
 class Worker {
     char *_func_id;
     HANDLE _pipe;
 public:
-    explicit Worker(char* func_id) : _func_id(func_id){}
+    std::ofstream out;
+
+    explicit Worker(char* func_id);
 
     bool getFunctionResult(int x);
 

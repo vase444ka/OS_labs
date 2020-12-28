@@ -2,10 +2,12 @@
 
 namespace spos::lab1 {
 
-ManagerBase::ManagerBase(int x_arg) :
-        _x_arg{x_arg} {}
+Manager::Manager(int x_arg) :
+        _x_arg{x_arg} {
+    out.open("output.txt");
+}
 
-std::optional<PROCESS_INFORMATION> ManagerBase::_runWorker(const std::string &command_line) {
+std::optional<PROCESS_INFORMATION> Manager::_runWorker(const std::string &command_line) {
     STARTUPINFO startup_info;
     PROCESS_INFORMATION process_info;
 
@@ -23,17 +25,17 @@ std::optional<PROCESS_INFORMATION> ManagerBase::_runWorker(const std::string &co
     return process_info;
 }
 
-auto ManagerBase::_getResult(HANDLE pipe) -> std::optional<bool> {
-    std::cout << "Waiting for a client to connect to the _pipe... Thread no" << std::this_thread::get_id()<< std::endl;
+auto Manager::_getResult(HANDLE pipe) -> std::optional<bool> {
+    out << "Waiting for a client to connect to the _pipe... Thread no" << std::this_thread::get_id()<< std::endl;
     BOOL result = ConnectNamedPipe(pipe, nullptr);
 
     if (!result){
-        std::cout << "Failed to connect _pipe." << std::endl;
+        out << "Failed to connect _pipe." << std::endl;
         CloseHandle(pipe);
         return std::nullopt;
     }
 
-    std::cout << "Receiving data from _pipe..." << std::endl;
+    out << "Receiving data from _pipe..." << std::endl;
     char *buffer = new char[sizeof(bool)];
     DWORD numBytesRead = 0;
     result = ReadFile(
@@ -47,18 +49,18 @@ auto ManagerBase::_getResult(HANDLE pipe) -> std::optional<bool> {
     if (result) {
         bool res = (bool)(*buffer);
         delete [] buffer;
-        std::cout << "Value read "<< res <<"_____size(bytes)________"<<numBytesRead<< std::endl;
+        out << "Value read "<< res <<"_____size(bytes)________"<<numBytesRead<< std::endl;
         CloseHandle(pipe);
         return res;
     }
 
-    std::cout << "Failed to read data." << std::endl;
+    out << "Failed to read data." << std::endl;
     CloseHandle(pipe);
     return std::nullopt;
 }
 
-bool ManagerBase::_setup(std::string func_name) {
-    std::cout << "Creating an instance of a named _pipe..." << std::endl;
+bool Manager::_setup(std::string func_name) {
+    out << "Creating an instance of a named _pipe..." << std::endl;
     std::string pipe_name = R"(\\.\pipe\func_pipe_)";
     pipe_name += func_name;
 
@@ -74,11 +76,11 @@ bool ManagerBase::_setup(std::string func_name) {
     ));
 
     if (_pipe.back() == nullptr || _pipe.back() == INVALID_HANDLE_VALUE) {
-        std::cout << "Failed to create inbound pipe instance." << std::endl;
+        out << "Failed to create inbound pipe instance." << std::endl;
         return false;
     }
 
-    _func_futures.emplace_back(std::async(std::launch::async, _getResult, _pipe.back()));
+    _func_futures.emplace_back(std::async(std::launch::async, &Manager::_getResult, this, _pipe.back()));
     auto tmp_process_info = _runWorker(" " + func_name + " " + std::to_string(_x_arg) + " " + pipe_name);
     if (tmp_process_info.has_value()) {
         _process_info.push_back(tmp_process_info.value());
@@ -92,7 +94,7 @@ bool ManagerBase::_setup(std::string func_name) {
     return true;
 }
 
-bool ManagerBase::_compute() {
+Manager::RunExitCode Manager::_compute() {
     std::vector<bool> func_results(2);
     int completed_count = 0;
     while (completed_count < 2) {
@@ -105,29 +107,30 @@ bool ManagerBase::_compute() {
         if (ready_future_it != _func_futures.end()) {
             std::optional <bool> ready_future = (*ready_future_it).get();
             if (!ready_future)
-                return false;
+                return PIPE_CONNECTION_FAILED;
 
             int res_no = std::distance(_func_futures.begin(), ready_future_it);
             func_results[res_no] = ready_future.value();
-            std::cout << "\n------------------------\nres_no: "<< res_no <<" = "<<ready_future.value()<< std::endl;
+            if (func_results[res_no] && completed_count < 2){
+                UINT exit_code;
+                TerminateProcess(_process_info[(res_no + 1) % 2].hProcess, exit_code);
+                _res = true;
+                return SHORT_CIRCUIT_EVALUATED;
+            }
+            out << "\n------------------------\nres_no: "<< res_no <<" = "<<ready_future.value()<< std::endl;
             completed_count++;
         }
     }
 
     _res = (func_results[0] || func_results[1]);
-    return true;
+    return SUCCESS;
 }
 
-ManagerBase::RunExitCode ManagerBase::run() {
+Manager::RunExitCode Manager::run() {
     if (!_setup("f") || !_setup("g")) {
         return SETUP_FAILED;
     }
-    if (_compute()){
-        return SUCCESS;
-    }
-    else{
-        return PIPE_CONNECTION_FAILED;
-    }
+    return _compute();
 }
 
 

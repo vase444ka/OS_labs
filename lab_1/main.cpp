@@ -2,10 +2,7 @@
 #include "src/manager.hpp"
 
 int main() {
-
-    freopen("output.txt", "w", stdout);
-
-    spos::lab1::ManagerBase test(1);
+    spos::lab1::Manager test(2);
     test.run();
 
     std::optional <bool> res = test.getResult();

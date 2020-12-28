@@ -13,25 +13,26 @@
 #include <algorithm>
 #include <future>
 #include <iostream>
-#include <atomic>
+#include <fstream>
 
 namespace spos::lab1 {
 
-    class ManagerBase {
+    class Manager {
     public:
         enum RunExitCode {
             SETUP_FAILED, PIPE_CONNECTION_FAILED, SUCCESS, SHORT_CIRCUIT_EVALUATED
         };
+        std::ofstream out;
 
-        explicit ManagerBase(int x_arg);
+        explicit Manager(int x_arg);
         RunExitCode run();
         std::optional <bool> getResult(){return _res;}
 
     private:
         static auto _runWorker(const std::string &command_line) -> std::optional<PROCESS_INFORMATION>;
-        static auto _getResult(HANDLE pipe) -> std::optional<bool>;
+        auto _getResult(HANDLE pipe) -> std::optional<bool>;
         bool _setup(std::string);
-        bool _compute();
+        RunExitCode _compute();
 
         int _x_arg;
         std::optional<bool> _res;
