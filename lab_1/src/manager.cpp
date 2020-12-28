@@ -1,7 +1,5 @@
 #include "manager.hpp"
 
-#include <thread>//debug
-
 namespace spos::lab1 {
 
 ManagerBase::ManagerBase(int x_arg) :
@@ -94,34 +92,42 @@ bool ManagerBase::_setup(std::string func_name) {
     return true;
 }
 
-ManagerBase::RunExitCode ManagerBase::run() {
-    if (!_setup("f") || !_setup("g")) {
-        return SETUP_FAILED;
-    }
-
-    std::vector<bool> func_results;
-    while (!_func_futures.empty()) {
+bool ManagerBase::_compute() {
+    std::vector<bool> func_results(2);
+    int completed_count = 0;
+    while (completed_count < 2) {
         const auto ready_future_it = std::find_if(
                 _func_futures.begin(),
                 _func_futures.end(),
-                [](auto &fut) { return fut.wait_for(std::chrono::seconds(0)) == std::future_status::ready; });
+                [](auto &fut) { return fut.valid() && fut.wait_for(std::chrono::seconds(0)) == std::future_status::ready; });
 
 
         if (ready_future_it != _func_futures.end()) {
             std::optional <bool> ready_future = (*ready_future_it).get();
             if (!ready_future)
-                return PIPE_CONNECTION_FAILED;
+                return false;
 
             int res_no = std::distance(_func_futures.begin(), ready_future_it);
-            func_results.push_back(ready_future.value());
+            func_results[res_no] = ready_future.value();
             std::cout << "\n------------------------\nres_no: "<< res_no <<" = "<<ready_future.value()<< std::endl;
-            _func_futures.erase(ready_future_it);
+            completed_count++;
         }
     }
-    if (func_results.size() == 2)
-        _res = (func_results[0] || func_results[1]);
 
-    return SUCCESS;
+    _res = (func_results[0] || func_results[1]);
+    return true;
+}
+
+ManagerBase::RunExitCode ManagerBase::run() {
+    if (!_setup("f") || !_setup("g")) {
+        return SETUP_FAILED;
+    }
+    if (_compute()){
+        return SUCCESS;
+    }
+    else{
+        return PIPE_CONNECTION_FAILED;
+    }
 }
 
 

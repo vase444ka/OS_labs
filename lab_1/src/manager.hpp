@@ -31,6 +31,7 @@ namespace spos::lab1 {
         static auto _runWorker(const std::string &command_line) -> std::optional<PROCESS_INFORMATION>;
         static auto _getResult(HANDLE pipe) -> std::optional<bool>;
         bool _setup(std::string);
+        bool _compute();
 
         int _x_arg;
         std::optional<bool> _res;
