@@ -95,9 +95,20 @@ bool Manager::_setup(std::string func_name) {
 }
 
 Manager::RunExitCode Manager::_compute() {
-    std::vector<bool> func_results(2);
+    _func_results.resize(2);
+    _status.resize(2, false);
     int completed_count = 0;
     while (completed_count < 2) {
+        if (GetAsyncKeyState(VK_ESCAPE)){
+            UINT exit_code;
+            for (int i = 0; i < 2; i++)
+                if (!_status[i]) {
+                    TerminateProcess(_process_info[i].hProcess, exit_code);
+                    CloseHandle(_pipe[i]);
+                }
+            return CANCELLED;
+        }
+
         const auto ready_future_it = std::find_if(
                 _func_futures.begin(),
                 _func_futures.end(),
@@ -110,8 +121,9 @@ Manager::RunExitCode Manager::_compute() {
                 return PIPE_CONNECTION_FAILED;
 
             int res_no = std::distance(_func_futures.begin(), ready_future_it);
-            func_results[res_no] = ready_future.value();
-            if (func_results[res_no] && completed_count < 2){
+            _func_results[res_no] = ready_future.value();
+            _status[res_no] = true;
+            if (_func_results[res_no] && completed_count < 2){
                 UINT exit_code;
                 TerminateProcess(_process_info[(res_no + 1) % 2].hProcess, exit_code);
                 _res = true;
@@ -122,15 +134,50 @@ Manager::RunExitCode Manager::_compute() {
         }
     }
 
-    _res = (func_results[0] || func_results[1]);
+    _res = (_func_results[0] || _func_results[1]);
     return SUCCESS;
 }
 
-Manager::RunExitCode Manager::run() {
+void Manager::run() {
     if (!_setup("f") || !_setup("g")) {
-        return SETUP_FAILED;
+        _run_msg = SETUP_FAILED;
+        return;
     }
-    return _compute();
+    _run_msg =  _compute();
+}
+
+void Manager::printResult() {
+    std::cout<<"----COMPUTATION STATUS---- x = "<<_x_arg<<" ----"<<std::endl;
+    switch (_run_msg) {
+        case SETUP_FAILED:
+            std::cout<<"SETUP FAILED"<<std::endl;
+            break;
+        case PIPE_CONNECTION_FAILED:
+            for (auto it: _status)
+                if (it)
+                    std::cout<<"> one function computed"<<std::endl;
+            std::cout<<"> (another) function(s) pipe(s) did not connect properly"<<std::endl;
+            break;
+        case SUCCESS:
+            std::cout<<"> f resulted into "<<_func_results[0]<<std::endl;
+            std::cout<<"> g resulted into "<<_func_results[1]<<std::endl;
+            std::cout<<"> binary operation resulted into"<<_res.value()<<std::endl;
+            break;
+        case SHORT_CIRCUIT_EVALUATED:
+            for (auto it: _status)
+                if (it)
+                    std::cout<<"> one function returned 1"<<std::endl;
+            std::cout<<"> result is short circuit evaluated"<<std::endl;
+            break;
+        case CANCELLED:
+            int i = 0;
+            while(!_status[i] && i < 2) i++;
+            if (i < 2)
+                std::cout<<"> function no."<<i<<" is computed. Function no."<<(i + 1) % 2<<" computation is cancelled"<<std::endl;
+            std::cout<<"> result is not defined"<<std::endl;
+            break;
+    }
+
 }
 
 

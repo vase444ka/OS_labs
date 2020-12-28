@@ -20,13 +20,13 @@ namespace spos::lab1 {
     class Manager {
     public:
         enum RunExitCode {
-            SETUP_FAILED, PIPE_CONNECTION_FAILED, SUCCESS, SHORT_CIRCUIT_EVALUATED
+            SETUP_FAILED, PIPE_CONNECTION_FAILED, SUCCESS, SHORT_CIRCUIT_EVALUATED, CANCELLED
         };
         std::ofstream out;
 
         explicit Manager(int x_arg);
-        RunExitCode run();
-        std::optional <bool> getResult(){return _res;}
+        void run();
+        void printResult();
 
     private:
         static auto _runWorker(const std::string &command_line) -> std::optional<PROCESS_INFORMATION>;
@@ -36,10 +36,13 @@ namespace spos::lab1 {
 
         int _x_arg;
         std::optional<bool> _res;
+        RunExitCode _run_msg;
 
         std::vector<std::future<std::optional<bool>>> _func_futures;
         std::vector<PROCESS_INFORMATION> _process_info;
         std::vector<HANDLE> _pipe;
+        std::vector<bool> _func_results;
+        std::vector<bool> _status;
     };
 
 } //namespace spos::lab1
