@@ -8,16 +8,22 @@
 #include "demofuncs.hpp"
 #include <iostream>
 #include <windows.h>
+#include <fstream>
 
 namespace spos::lab1::utils {
 class Worker {
     char *_func_id;
+    HANDLE _pipe;
 public:
-    explicit Worker(char* func_id) : _func_id(func_id){}
+    std::ofstream out;
+
+    explicit Worker(char* func_id);
 
     bool getFunctionResult(int x);
 
-    static int sendResult(char *pipe_name, char* buffer, unsigned int numOfBytes);
+    int connectPipe(char *pipe_name);
+
+    int sendResult(char* buffer, unsigned int numOfBytes);
 };
 
 char* dummyCStrCast(bool arg);

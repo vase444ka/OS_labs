@@ -2,13 +2,12 @@
 #include "src/manager.hpp"
 
 int main() {
+    int x;
+    std::cin>>x;
 
-    freopen("output.txt", "w", stdout);
-
-    spos::lab1::Manager test("OR", 1);
+    spos::lab1::Manager test(x);
     test.run();
-
-    std::cout<<test.getResult().value();
+    test.printResult();
 
     return 0;
 }

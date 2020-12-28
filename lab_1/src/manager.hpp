@@ -13,30 +13,36 @@
 #include <algorithm>
 #include <future>
 #include <iostream>
-#include <any>
+#include <fstream>
 
 namespace spos::lab1 {
 
     class Manager {
     public:
         enum RunExitCode {
-            PIPE_PROCESS_CREATION_FAILED, PIPE_CONNECTION_FAILED, SUCCESS, PROCESS_CREATION_FAILED
+            SETUP_FAILED, PIPE_CONNECTION_FAILED, SUCCESS, SHORT_CIRCUIT_EVALUATED, CANCELLED
         };
+        std::ofstream out;
 
-        Manager(std::string op_name, int x_arg);
-        RunExitCode run();
-        std::optional <bool> getResult(){return _res;}
+        explicit Manager(int x_arg);
+        void run();
+        void printResult();
 
     private:
         static auto _runWorker(const std::string &command_line) -> std::optional<PROCESS_INFORMATION>;
-        static auto _getFunctionResult(HANDLE pipe) -> std::optional<bool>;
+        auto _getResult(HANDLE pipe) -> std::optional<bool>;
+        bool _setup(std::string);
+        RunExitCode _compute();
 
         int _x_arg;
         std::optional<bool> _res;
-        std::string _op_name;
-        std::optional<PROCESS_INFORMATION> _f_process_info;
-        std::optional<PROCESS_INFORMATION> _g_process_info;
-        HANDLE _f_func_pipe, _g_func_pipe;
+        RunExitCode _run_msg;
+
+        std::vector<std::future<std::optional<bool>>> _func_futures;
+        std::vector<PROCESS_INFORMATION> _process_info;
+        std::vector<HANDLE> _pipe;
+        std::vector<bool> _func_results;
+        std::vector<bool> _status;
     };
 
 } //namespace spos::lab1
